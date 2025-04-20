@@ -1,17 +1,23 @@
 @echo off
 chcp 65001 >nul
-title [ F$CK ⚡ – File System Cleaner Kit v1.1 ]
+title [ F$CK ⚡ – File System Cleaner Kit v1.2 ]
 color 0A
 mode con: cols=100 lines=50
 
 setlocal EnableDelayedExpansion
-set "VERSION=1.1"
+set "VERSION=1.2"
 set "SCRIPT_PATH=%~f0"
 set "SCRIPT_DIR=%~dp0"
 set "LOG_FILE=%SCRIPT_DIR%F$CK_LOG.txt"
+set "HISTORY_FILE=%SCRIPT_DIR%F$CK_HISTORY.log"
+set "ARCHIVE_DIR=%APPDATA%\F$CK-Archive"
 set /a FUP_COUNT=0
 set "UPDATE_URL=https://raw.githubusercontent.com/KnechtUnrecht/FCK-CLEANER/main/F$CK.bat"
 set "UPDATE_TEMP=%TEMP%\F$CK_UPDATE.bat"
+set "QUICK=0"
+
+:: ──────────────── QUICK MODE CHECK ────────────────
+if /i "%1"=="/quick" set QUICK=1
 
 :: ──────────────── ASCII HEADER ────────────────
 echo.
@@ -35,7 +41,7 @@ echo. F::::::::FF            $$$$$$:::$$$$$        CCC::::::::::::CK:::::::K    
 echo. FFFFFFFFFFF                 $:::$               CCCCCCCCCCCCCKKKKKKKKK    KKKKKKK
 echo.                             $$$$$                                               
 echo.
-echo.               🧼 F$CK YOUR SYSTEM CLEAN 🧼
+echo.               🧼 F$CK YOUR SYSTEM CLEAN v1.2 🧼
 echo.
 
 :: ──────────────── LOG INIT ────────────────
@@ -55,13 +61,15 @@ set i=0
 set paths[!i!]=%TEMP% & set /a i+=1
 set paths[!i!]=%SystemRoot%\Temp & set /a i+=1
 set paths[!i!]=%UserProfile%\AppData\Local\Temp & set /a i+=1
-set paths[!i!]=%UserProfile%\Downloads & set /a i+=1
-set paths[!i!]=%LocalAppData%\NVIDIA\DXCache & set /a i+=1
-set paths[!i!]=%LocalAppData%\NVIDIA\GLCache & set /a i+=1
-set paths[!i!]=%LocalAppData%\AMD\DxCache & set /a i+=1
 set paths[!i!]=%LocalAppData%\Google\Chrome\User Data\Default\Cache & set /a i+=1
 set paths[!i!]=%AppData%\Mozilla\Firefox\Profiles\ & set /a i+=1
-set paths[!i!]=C:\Windows\SoftwareDistribution\Download & set /a i+=1
+if !QUICK!==0 (
+    set paths[!i!]=%UserProfile%\Downloads & set /a i+=1
+    set paths[!i!]=%LocalAppData%\NVIDIA\DXCache & set /a i+=1
+    set paths[!i!]=%LocalAppData%\NVIDIA\GLCache & set /a i+=1
+    set paths[!i!]=%LocalAppData%\AMD\DxCache & set /a i+=1
+    set paths[!i!]=C:\Windows\SoftwareDistribution\Download & set /a i+=1
+)
 
 :: ──────────────── CLEANING LOOP ────────────────
 echo.
@@ -72,7 +80,10 @@ for /L %%x in (0,1,!i!) do (
         echo 🧹 Cleaning: !target!
         if exist "!target!" (
             for /r "!target!" %%f in (*.*) do (
-                del /f /q "%%f" >nul 2>&1 && set /a FUP_COUNT+=1
+                rem -- skip protected system files
+                echo %%~nxf | findstr /R ".*\.dll .*\.sys .*\.bat" >nul && (echo ⚠️ Skipped protected file: %%~nxf) || (
+                    del /f /q "%%f" >nul 2>&1 && set /a FUP_COUNT+=1
+                )
             )
             for /d %%D in ("!target!\*") do rd /s /q "%%D" >nul 2>&1
         )
@@ -94,9 +105,13 @@ echo.
 echo 📊 FUPOGs Destroyed: !FUP_COUNT!
 echo [!bar!]
 
-:: ──────────────── LOG COMPLETION ────────────────
-echo [%date% %time%] !FUP_COUNT! FUPOGs eliminated. >> "%LOG_FILE%"
-echo [%date% %time%] Session end. >> "%LOG_FILE%"
+:: ──────────────── ARCHIVE LOG ────────────────
+if not exist "%ARCHIVE_DIR%" mkdir "%ARCHIVE_DIR%"
+set "ZIPLOG=%ARCHIVE_DIR%\F$CK_%date:~0,4%-%date:~5,2%-%date:~8,2%_%time:~0,2%-%time:~3,2%.zip"
+powershell -nologo -noprofile -command "Compress-Archive -Path '%LOG_FILE%' -DestinationPath '%ZIPLOG%'" >nul 2>&1
+
+:: ──────────────── HISTORY LOG ────────────────
+echo [%date% %time%] F$CK Run: !FUP_COUNT! FUPOGs cleaned. >> "%HISTORY_FILE%"
 
 :: ──────────────── SELF-UPDATER ────────────────
 curl -s -o "%UPDATE_TEMP%" "%UPDATE_URL%" >nul 2>&1
@@ -106,7 +121,7 @@ if exist "%UPDATE_TEMP%" (
         echo 🔁 Update found. Replacing and restarting...
         timeout /t 1 >nul
         copy /y "%UPDATE_TEMP%" "%SCRIPT_PATH%" >nul
-        start "" "%SCRIPT_PATH%"
+        start "" cmd /v:on /c "%SCRIPT_PATH%"
         del "%UPDATE_TEMP%" >nul
         exit /b
     ) else (
@@ -115,6 +130,6 @@ if exist "%UPDATE_TEMP%" (
 )
 
 :: ──────────────── DONE ────────────────
-echo ✅ F$CK completed (v1.1). Log written.
+echo ✅ F$CK v1.2 completed. Log & history written.
 timeout /t 5 >nul
 exit /b
