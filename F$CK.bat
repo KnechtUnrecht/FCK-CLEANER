@@ -11,16 +11,7 @@ set "SCRIPT_DIR=%~dp0"
 set "LOG_FILE=%SCRIPT_DIR%F$CK_LOG.txt"
 set /a FUP_COUNT=0
 set "UPDATE_URL=https://raw.githubusercontent.com/KnechtUnrecht/FCK-CLEANER/main/F$CK.bat"
-set "UPDATE_FILE=%TEMP%\F$CK_UPDATE.bat"
-
-:: ──────────────── SELF-REPLACE BLOCK ────────────────
-if "%~nx0"=="F$CK_UPDATE.bat" (
-    timeout /t 1 >nul
-    copy /y "%~f0" "%SCRIPT_DIR%F$CK.bat" >nul
-    start "" "%SCRIPT_DIR%F$CK.bat"
-    del "%~f0"
-    exit /b
-)
+set "UPDATE_TEMP=%TEMP%\F$CK_UPDATE.bat"
 
 :: ──────────────── ASCII HEADER ────────────────
 echo.
@@ -108,15 +99,18 @@ echo [%date% %time%] !FUP_COUNT! FUPOGs eliminated. >> "%LOG_FILE%"
 echo [%date% %time%] Session end. >> "%LOG_FILE%"
 
 :: ──────────────── SELF-UPDATER ────────────────
-curl -s -o "%UPDATE_FILE%" "%UPDATE_URL%" >nul 2>&1
-if exist "%UPDATE_FILE%" (
-    findstr /C:"set \"VERSION=" "%UPDATE_FILE%" | findstr /V "!VERSION!" >nul
+curl -s -o "%UPDATE_TEMP%" "%UPDATE_URL%" >nul 2>&1
+if exist "%UPDATE_TEMP%" (
+    findstr /C:"set \"VERSION=" "%UPDATE_TEMP%" | findstr /V "!VERSION!" >nul
     if %errorlevel%==0 (
-        echo 🔁 Update found. Launching new version...
-        start "" cmd /c "%UPDATE_FILE%"
+        echo 🔁 Update found. Replacing and restarting...
+        timeout /t 1 >nul
+        copy /y "%UPDATE_TEMP%" "%SCRIPT_PATH%" >nul
+        start "" "%SCRIPT_PATH%"
+        del "%UPDATE_TEMP%" >nul
         exit /b
     ) else (
-        del "%UPDATE_FILE%" >nul
+        del "%UPDATE_TEMP%" >nul
     )
 )
 
